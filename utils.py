@@ -32,6 +32,11 @@ from torch import nn
 import torch.distributed as dist
 from PIL import ImageFilter, ImageOps
 
+# added Libraries by Sina
+import h5py
+from torch.utils.data import Dataset
+import glob
+
 
 class GaussianBlur(object):
     """
@@ -281,6 +286,54 @@ class SmoothedValue(object):
             global_avg=self.global_avg,
             max=self.max,
             value=self.value)
+
+# Added by sina, specified class for loading the dataset
+class ChunkedH5Dataset(Dataset):
+    def __init__(self, data_dir):
+        self.data_files = sorted(glob.glob(os.path.join(data_dir, 'patches_data_0*.h5')))
+        self.length = 0
+        self.file_lengths = []
+        self.cumulative_lengths = []
+        
+        # Calculate lengths and cumulative lengths
+        for data_file in self.data_files:
+            with h5py.File(data_file, 'r') as f:
+                file_length = f['whole_data'].shape[0]
+                self.file_lengths.append(file_length)
+                self.length += file_length
+                self.cumulative_lengths.append(self.length)
+        
+        self.h5_files = [None] * len(self.data_files)
+        
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx):
+        # Find the file corresponding to idx
+        file_idx = next(i for i, cl in enumerate(self.cumulative_lengths) if idx < cl)
+        local_idx = idx - (self.cumulative_lengths[file_idx - 1] if file_idx > 0 else 0)
+        
+        # Open the file if not already open
+        if self.h5_files[file_idx] is None:
+            self.h5_files[file_idx] = h5py.File(self.data_files[file_idx], 'r')
+        
+        f = self.h5_files[file_idx]
+        data_point = f['whole_data'][local_idx]
+        
+        # Process data_point as before
+        input_data = data_point[0]
+        output_data = data_point[1,:60,:]
+        
+        input_tensor = torch.from_numpy(input_data).float()
+        output_tensor = torch.from_numpy(output_data).float()
+
+        return input_tensor, output_tensor
+    
+    def __del__(self):
+        # Close all open HDF5 files
+        for f in self.h5_files:
+            if f is not None:
+                f.close()
 
 
 def reduce_dict(input_dict, average=True):
@@ -827,3 +880,8 @@ def multi_scale(samples, model):
     v /= 3
     v /= v.norm()
     return v
+
+
+
+
+
