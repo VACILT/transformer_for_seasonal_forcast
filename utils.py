@@ -322,7 +322,7 @@ class ChunkedH5Dataset(Dataset):
         
         # Process data_point as before
         input_data = data_point[0]
-        output_data = data_point[1,:60,:]
+        output_data = data_point[1,:5,:]
         
         input_tensor = torch.from_numpy(input_data).float()
         output_tensor = torch.from_numpy(output_data).float()
