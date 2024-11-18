@@ -4,7 +4,7 @@
 #SBATCH --account=bb1438                # Account name
 #SBATCH --nodes=2                       # Number of nodes
 #SBATCH --ntasks-per-node=4             # Number of tasks per node (GPUs per node)
-#SBATCH --gres=gpu:4                    # Number of GPUs per node
+#SBATCH --gpus-per-node=a100_80:4       # Number of GPUs per node
 #SBATCH --cpus-per-task=32              # CPU cores per task
 #SBATCH --mem=512G                      # Memory per node
 #SBATCH --time=12:00:00                 # Time limit hrs:min:sec
