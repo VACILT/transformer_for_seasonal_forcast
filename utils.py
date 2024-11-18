@@ -150,7 +150,7 @@ def cancel_gradients_last_layer(epoch, model, freeze_last_layer):
     if epoch >= freeze_last_layer:
         return
     for n, p in model.named_parameters():
-        if "last_layer" in n:
+        if "head" in n:                  # modified by Sina
             p.grad = None
 
 
@@ -290,7 +290,7 @@ class SmoothedValue(object):
 # Added by sina, specified class for loading the dataset
 class ChunkedH5Dataset(Dataset):
     def __init__(self, data_dir):
-        self.data_files = sorted(glob.glob(os.path.join(data_dir, 'patches_data_0*.h5')))
+        self.data_files = sorted(glob.glob(os.path.join(data_dir, 'patches_train_data_0*.h5')))
         self.length = 0
         self.file_lengths = []
         self.cumulative_lengths = []
@@ -334,6 +334,38 @@ class ChunkedH5Dataset(Dataset):
         for f in self.h5_files:
             if f is not None:
                 f.close()
+
+
+
+class ValidationH5Dataset(Dataset):
+    def __init__(self, data_dir):
+        self.file_path = os.path.join(data_dir, 'patches_test_data.h5')
+        self.h5_file = None  
+        
+        with h5py.File(self.file_path, 'r') as f:
+            self.length = f['whole_data'].shape[0]
+    
+    def __len__(self):
+        return self.length
+    
+    def __getitem__(self, idx):
+        if self.h5_file is None:
+            self.h5_file = h5py.File(self.file_path, 'r')
+        
+        data_point = self.h5_file['whole_data'][idx]
+        
+        input_data = data_point[0]
+        output_data = data_point[1, :5, :] 
+        
+        input_tensor = torch.from_numpy(input_data).float()
+        output_tensor = torch.from_numpy(output_data).float()
+        
+        return input_tensor, output_tensor
+    
+    def __del__(self):
+        if self.h5_file is not None:
+            self.h5_file.close()
+
 
 
 def reduce_dict(input_dict, average=True):
@@ -517,26 +549,34 @@ def setup_for_distributed(is_master):
     __builtin__.print = print
 
 
+
 def init_distributed_mode(args):
-    # launched with torch.distributed.launch
+    # Launched with torchrun
     if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
-        args.rank = int(os.environ["RANK"])
+        # Torchrun environment variables
+        print('Will run using torchrun.')
+        args.rank = int(os.environ['RANK'])
         args.world_size = int(os.environ['WORLD_SIZE'])
         args.gpu = int(os.environ['LOCAL_RANK'])
-    # launched with submitit on a slurm cluster
+        # args.dist_url = 'env://'
+    # Launched with SLURM without torchrun
     elif 'SLURM_PROCID' in os.environ:
+        # SLURM environment variables
+        print('Will run using SLURM.')
         args.rank = int(os.environ['SLURM_PROCID'])
-        args.gpu = args.rank % torch.cuda.device_count()
-    # launched naively with `python main_dino.py`
-    # we manually add MASTER_ADDR and MASTER_PORT to env variables
+        args.world_size = int(os.environ['SLURM_NTASKS'])
+        args.gpu = int(os.environ['SLURM_LOCALID'])
+        # args.dist_url = 'env://'
     elif torch.cuda.is_available():
         print('Will run the code on one GPU.')
         args.rank, args.gpu, args.world_size = 0, 0, 1
         os.environ['MASTER_ADDR'] = '127.0.0.1'
         os.environ['MASTER_PORT'] = '29500'
+        # args.dist_url = 'env://'
     else:
         print('Does not support training without GPU.')
         sys.exit(1)
+    
 
     dist.init_process_group(
         backend="nccl",
@@ -550,6 +590,7 @@ def init_distributed_mode(args):
         args.rank, args.dist_url), flush=True)
     dist.barrier()
     setup_for_distributed(args.rank == 0)
+
 
 
 def accuracy(output, target, topk=(1,)):
