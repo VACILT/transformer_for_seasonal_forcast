@@ -2,47 +2,39 @@
 #SBATCH --job-name=train_transformer    # Job name
 #SBATCH --partition=gpu                 # Partition name
 #SBATCH --account=bb1438                # Account name
-#SBATCH --nodes=2                       # Number of nodes
+#SBATCH --nodes=1                       # Number of nodes
 #SBATCH --ntasks-per-node=4             # Number of tasks per node (GPUs per node)
-#SBATCH --gpus-per-node=4               # Number of GPUs per node
+#SBATCH --gpus=4                        # Number of GPUs per node
 #SBATCH --cpus-per-task=32              # CPU cores per task
 #SBATCH --mem=0                         # Request all memory available on all nodes
 #SBATCH --time=12:00:00                 # Time limit hrs:min:sec
 #SBATCH --output=logs/%x-%j.out         # Standard output and error log
 
-
 module load pytorch
-
 
 # Set OMP_NUM_THREADS
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-
-# Get the master address from SLURM
-MASTER_ADDR=$(scontrol show hostnames $SLURM_NODELIST | head -n 1)
+# Since we're on a single node, we can set MASTER_ADDR to localhost
+MASTER_ADDR=127.0.0.1
 export MASTER_ADDR
+echo "MASTER_ADDR: $MASTER_ADDR"
 
-# Set a master port (choose an open port)
-MASTER_PORT=12345
+# Set a master port (choose any free port)
+MASTER_PORT=12355
 export MASTER_PORT
+echo "MASTER_PORT: $MASTER_PORT"
 
-# Set node rank using SLURM_NODEID
-NODE_RANK=$SLURM_NODEID
+# Set node rank to 0 since there's only one node
+NODE_RANK=0
 export NODE_RANK
+echo "NODE_RANK: $NODE_RANK"
 
-# (Optional) Set NCCL environment variables if you know your hardware supports it
-# If unsure, it's safer to omit these settings
-# export NCCL_DEBUG=INFO
-# export NCCL_P2P_LEVEL=NVL
-# export NCCL_SOCKET_IFNAME=^lo,docker0
-# export NCCL_IB_GDR=0
+echo "SLURM_NODELIST: $SLURM_NODELIST"
 
 # Run the training script using torchrun
 torchrun \
-    --nnodes=2 \
+    --nnodes=1 \
     --nproc_per_node=4 \
-    --rdzv_backend=c10d \
-    --rdzv_endpoint=$MASTER_ADDR:$MASTER_PORT \
-    --node_rank=$NODE_RANK \
     main_dino.py \
     --arch vit_small \

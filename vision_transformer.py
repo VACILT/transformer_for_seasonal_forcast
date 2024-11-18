@@ -153,7 +153,7 @@ class VisionTransformer(nn.Module):
         self.num_features = self.embed_dim = embed_dim
 
         self.patch_embed = PatchEmbed(
-            num_tokens=num_patches, input_dim=input_dim, embed_dim=embed_dim)
+            num_patches=num_patches, input_dim=input_dim, embed_dim=embed_dim)
         num_patches = self.patch_embed.num_patches
 
         self.cls_token = nn.Parameter(torch.zeros(1, num_predictor, embed_dim))
