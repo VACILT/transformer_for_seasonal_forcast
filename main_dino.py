@@ -119,7 +119,8 @@ def train_model(args):
     )
 
 
-    print(f"Data loaded: there are {len(dataset)} data points.")       # modified by Sina
+    print(f"Train data loaded: there are {len(dataset)} data points.")       
+    print(f"validation data  loaded: there are {len(dataset_val)} data points.")       
 
     # ============ building the Model ... ============
     # we changed the name DeiT-S for ViT-S to avoid confusions
@@ -249,8 +250,10 @@ def train_one_epoch(Model, model_loss, data_loader,
                 param_group["weight_decay"] = wd_schedule[it]
 
         # move data to gpu
-        input_data = [im.cuda(non_blocking=True) for im in input_data]
-        output_data = [im.cuda(non_blocking=True) for im in output_data]
+        input_data = input_data.cuda(non_blocking=True)
+        output_data = output_data.cuda(non_blocking=True)
+        # input_data = [im.cuda(non_blocking=True) for im in input_data]
+        # output_data = [im.cuda(non_blocking=True) for im in output_data]
         # teacher and student forward passes + compute dino loss
         with torch.cuda.amp.autocast(fp16_scaler is not None): 
             model_output = Model(input_data)
@@ -298,8 +301,10 @@ def validate(Model, model_loss, data_loader_val, fp16_scaler):
 
     with torch.no_grad():
         for input_data_val, output_data_val in metric_logger.log_every(data_loader_val, 10, header):
-            input_data_val = [im.cuda(non_blocking=True) for im in input_data_val]
-            output_data_val = [im.cuda(non_blocking=True) for im in output_data_val]
+            input_data_val = input_data_val.cuda(non_blocking=True)
+            output_data_val = output_data_val.cuda(non_blocking=True)
+            # input_data_val = [im.cuda(non_blocking=True) for im in input_data_val]
+            # output_data_val = [im.cuda(non_blocking=True) for im in output_data_val]
 
             if fp16_scaler is None:
                 model_output = Model(input_data_val)
